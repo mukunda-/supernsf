@@ -1,0 +1,46 @@
+DWORD	NUMBER OF PCM CHANNELS
+DWORD	NUMBER OF PCM SAMPLES
+DWORD	VRC6 USED (BOOLEAN)
+BYTE*11	CHANNEL MAP
+
+for X samples:
+
+DWORD	LENGTH
+DWORD	LOOP LENGTH
+BYTE	BIDI LOOP
+BYTE*X	(DATA)
+
+SEQUENCER DATA:
+
+DWORD	number of frames
+DWORD	number of channels (11)
+
+for each FRAME:
+
+--------------------------------------------------
+for each CHANNEL:
+DWORD	FREQUENCY
+BYTE	NEWNOTE (BOOLEAN)
+BYTE	TIMBRE
+BYTE	VOLUME
+BYTE	SAMPLE OFFSET (ONLY USED FOR PCM CHANNELS) (STILL EXPORTED FOR OTHER CHANNELS)
+--------------------------------------------------
+
+DWORD	DURATION (MICROSECONDS) OF FRAME
+
+________________________________________________________
+
+channel map entries:
+
+0=UNMAPPED
+1=PULSE1
+2=PULSE2
+3=TRI
+4=NOISE
+5=VRC6 PULSE1
+6=VRC6 PULSE2
+7=VRC6 SAWTOOTH
+8=PCM1
+9=PCM2
+10=PCM3
+11=PCM4

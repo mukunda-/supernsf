@@ -1,0 +1,162 @@
+
+ SuperNSF User's Manual
+________________________________________________________________________________
+
+Composing a Song
+________________________________________________________________________________
+
+Step 1.
+
+  Create a new Impulse Tracker module.
+
+Step 2.
+ 
+  Goto the song message and type:
+
+  [**SUPER-NSF**]
+
+  make a new line and then type:
+
+  map sqr sqr tri nse pcm pcm pcm
+
+Step 3.
+
+  Understand what you did in step 2; you listed the channel map
+  now channel 1 in the module will control the first 2A03 square
+  wave, channel 2 the second, channel 3 the triangle wave, channel 4
+  the noise generator, and channels 5,6,7 will be PCM channels!
+
+  You may rearrange this map to whatever suits your taste, you can have
+  upto 4 PCM channels too. The sampling rate of the PCM channels will
+  be degraded with how many of them there are.
+
+  1 channel : 20.1 KHz
+  2 channels: 14.7 KHz
+  3 channels: 12.0 KHz
+  4 channels: 10.2 KHz
+
+  You can also use the VRC6 expansion chip by listing 'vrc' and 'vrs'.
+  Since there are two pulse channels and one sawtooth channel you can list
+  'vrc' twice and 'vrs' once.
+
+Step 4.
+  
+  Compose a song.
+
+Step 5.
+  
+  Run through converter and listen to NSF, tweak the volume levels/macros, 
+  re-convert, tweak, rinse, repeat.
+
+  (also see Post-Mixing)
+
+
+________________________________________________________________________________
+
+Using Macros
+________________________________________________________________________________
+
+Macros can be written in the song information to control the duty cycle
+of the square waves, or the period of the noise channel.
+
+Under you're other commands you write:
+
+macro N x x x x x
+
+where N is the sample number you wish to link the macro with, and x
+being the macro entries.
+
+You can change the loop point in your macro with a | character between the nodes.
+By default the last node is looped, but the | can change it to a different spot.
+
+  e.g. "macro 1   0 1 1 | 0 0 1 1"
+
+For a 2A03 sample, the x is 0-3, for VRC6 the x is 0-7.
+For the noise channel, the x is 0-15 (specifying the noise period index)
+
+Any time an instrument uses that sample it will be affected by the macro.
+
+
+________________________________________________________________________________
+
+Primitive Macros
+________________________________________________________________________________
+
+The template IT file provided has some 'primitive macros' in it. These aren't
+listed in the song message, but they still control the duty cycle used in the
+square wave channels.
+
+To use a primitive macro, go to the sample you want to affect and type in the
+'DOS Filename' one of these keywords:
+
+2A03_DUTY0	equivalent to "macro x 0"
+2A03_DUTY1	equivalent to "macro x 1"
+2A03_DUTY2	equivalent to "macro x 2"
+2A03_DUTY3	equivalent to "macro x 3"
+VRC6_DUTY0	equivalent to "macro x 0"
+VRC6_DUTY1	equivalent to "macro x 1"
+VRC6_DUTY2	equivalent to "macro x 2"
+VRC6_DUTY3	equivalent to "macro x 3"
+VRC6_DUTY4	equivalent to "macro x 4"
+VRC6_DUTY5	equivalent to "macro x 5"
+VRC6_DUTY6	equivalent to "macro x 6"
+VRC6_DUTY7	equivalent to "macro x 7"
+
+________________________________________________________________________________
+
+Post-Mixing
+________________________________________________________________________________
+
+There is another special command that can be used to adjust the mixing
+level of the generated sequencer track:
+
+  mixing a b c d e f g h i j k
+
+The arguments of this command are numbers ranging from 0-100, any volume
+encountered in the channels of the module will be scaled by this number.
+This is useful to scale the volume of the final result without affecting
+the volume in the tracker.
+
+
+________________________________________________________________________________
+
+Example Song Message
+________________________________________________________________________________
+
+my great songle
+(c) 2010 stewart cosby
+
+[**SUPER-NSF**]
+
+map    sqr sqr tri nse pcm pcm pcm pcm vrc vrc vrs
+mixing 50  50  100 100 100 100 100 100 60  60  60
+
+macro 1   0 1 1 | 0 0 1 1        # stupid square wave
+macro 2   0 14 14 6 4 3 4 3 2 0  # noise snare (need instrument envelope)
+
+
+________________________________________________________________________________
+
+Limitations
+________________________________________________________________________________
+
+No new-note-actions, duh.
+
+
+________________________________________________________________________________
+
+Hefty Tips
+________________________________________________________________________________
+
+Using envelopes and other automated stuff will increase the size of the
+sequencer data substantially, avoid them whenever possible.
+
+Use a lower BPM to also reduce the amount of sequencer data generated.
+
+
+_____________________________________________
+SuperNSF (C) 2010 
+   Mukunda Johnson (NSF Driver)
+   Andrew Richards (Sequencer Data Optimizer)
+
+[timestamp] 11:15 PM 8/7/2010

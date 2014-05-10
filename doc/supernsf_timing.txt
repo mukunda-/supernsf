@@ -1,0 +1,111 @@
+SuperNSF Timing Data
+-------------------------------------
+
+Cycles For Update (CFU): 40
+Cycles For Mixing (CFM): 39,72,99,126 (1-4 PCM channels)
+
+NES Cycle Execution Speed: 1789773 HZ
+
+-------------------------------------
+
+SuperNSF Main Program Flow
+
+Init: <program entry>
+ Initialize channels/data and jump to main loop
+
+Main Loop:
+ Mix pcm samples and output to DAC
+ Run update routine *** (next section describes what is done here)
+ Increment pcm channel data pointers (cycle errors occur here)
+ Loop
+
+Total execution time: "CFM+CFU+error" cycles
+
+error:
+  +12 cycles per channel crossing a memory page (256 bytes)
+  +16 cycles per channel crossing a memory bank (4096 bytes)
+  (12+16 total for a bank cross)
+
+-------------------------------------
+
+SuperNSF Update Flow ***
+
+(each [] is an 'update cycle')
+(each update cycle is done during one sample output)
+
+Outside sequencer update:
+
+[PCM Channel 1 Loop Test]
+  [error:additional update if channel reaches loop point]
+[PCM Channel 2 Loop Test] \
+[PCM Channel 3 Loop Test]  > skipped if channel doesnt exist
+[PCM Channel 4 Loop Test] /
+[Sequencer Counter]
+  <enter sequencer update if counter expires>
+
+(Update cycles per sequencer counter iteration: "CHANNELS+1"+error)
+
+(error: +1 update per channel that reaches its end/loop point)
+
+---
+
+Inside sequencer update:
+
+[Read Event Header]
+->(next update is determined by event header)
+
+(2A03 SQUARE <0,1>)
+[Sweep Reset Function]
+[Period/Sweep Setting]
+[Volume/Duty Setting]
+
+(2A03 TRIANGLE <2>)
+[Sweep Reset Function]
+[Period/Sweep Setting]
+  [Additional update only if writing complete period]
+[Enable Setting]
+
+(2A03 Noise <3>)
+[Copy Settings]
+
+(VRC6 Square/Sawtooth <4,5,6>)
+[Sweep Reset Function]
+[Period/Sweep Setting]
+  [Additional update only if writing complete period]
+[Volume/Duty Setting]
+
+(PCM <7,8,9,10>)
+[Preparation/Sample Setting]
+[Sample Offset (1)]		\ 
+[Sample Offset (2)]		 >skipped if no sample offset
+[Sample Offset (3)]		/
+[Sample Setting (1)] ---> skipped if no sample setting, or sample offset used
+[Sample Setting (2)] ---> skipped if no sample setting, or sample offset used
+[Volume Setting]
+[Frequency/Sweep Setting]
+  [Additional update only if writing complete frequency]
+
+(Memory Page Cross <11>)
+[Adjust Sequencer Position]
+
+(End Frame/End Track <12,15>)
+[Read next delta value]
+(sequencer position is reset on command 15)
+
+Sweeps are processed after the frame end
+and then update execution returns to 'outside' mode
+
+[Sweep Triangle Wave]
+[Sweep VRC6 Pulse 1]
+[Sweep VRC6 Pulse 2]
+[Sweep VRC6 Sawtooth]
+[PCM1 Frequency Sweep]
+[PCM2 Frequency Sweep] \
+[PCM3 Frequency Sweep]  > Skipped if channel isn't used in module
+[PCM4 Frequency Sweep] /
+
+Note: Sweep updates always occur, regardless if the sweep variable is 0
+Another Note: The VRC6 sweep functions run regardless of vrc6 support.
+____________________________________________
+
+10:29 PM 8/5/2010

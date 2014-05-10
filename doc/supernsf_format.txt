@@ -1,0 +1,313 @@
+SuperNSF Format Definition
+___________________________.
+
+Extension: .nsf
+
+Terminology:
+  Page - 256 bytes
+  Bank - 4096 bytes
+
+  Address: 20bit address which is split up into	3 components
+    L: Byte Index (0-255)
+    H: Page Index (0-15)
+    B: Bank Index (0-255)
+    Absolute address is calculated with "L*1+H*256+B*4096"
+    (L = abs & 255)
+    (H = (abs >> 8) & 15)
+    (B = abs >> 12)
+
+--------------------------------------------------------------------------------
+
+NSF Header
+
+Byte*128	NSF Header Data
+		(set VRC6 setting as required)
+
+Data offsets/addresses do not include these 128 bytes.
+
+--------------------------------------------------------------------------------
+
+Update Vector Table
+
+Byte*256	<copy 80h-17fh from driver binary>
+
+--------------------------------------------------------------------------------
+
+Saturation Table
+
+Byte*256	PCM Saturation Table
+
+The saturation table is responsible for scaling and saturating the final
+output sample that is written to the DAC.
+
+The saturation table is read with the formula:
+  DAC = st[a+b+c+d]
+
+a,b,c,d being the sample of each channel.
+(a+b+c+d) is a signed two's complement number so the saturation table is
+split into two sections, first being the 0..127 positive part and then followed
+by the -128..-1 negative part.
+
+This table must be filled in by the exporter according to how many PCM channels
+are used and the desired output volume scale.
+
+The range of a,b,c,d is scaled according to how many channels there are
+
+For 1 channel, there is no mixing and the saturation table is not used.
+For 2 channels, the sample range is [-64,63] (7bit)
+For 3 channels, the sample range is [-42,41] (6.4bit)
+For 4 channels, the sample range is [-32,31] (6bit)
+(so they don't overflow 8 bits when added)
+
+PSUEDO CODE FOR WRITING SATURATION TABLE
+
+' assuming 3 channels
+' scaling to allow one channel to fill entire DAC range
+
+scale = 64 / 42
+
+For i = 0 To 255
+	' translate position
+	If i < 128 Then entry = i
+	If i >= 128 Then entry = i - 256
+
+	' scale sample
+	sample = entry * scale
+
+	' saturate sample
+	If sample > 63 Then sample = 63
+	If sample < -64 Then sample = -64
+
+	' unsign data
+	sample = sample + 64
+	
+	' write data
+	WriteByte( sample )
+Next
+
+--------------------------------------------------------------------------------
+
+Track Header
+
+Byte*64		Sample Start Addresses (L)
+Byte*64		Sample Start Addresses (H) ***
+Byte*64		Sample Start Addresses (B)
+
+Byte*64		Sample End Addresses (H)
+Byte*64		Sample End Addresses (B)
+
+		(Sample end addresses are limited to 256-byte boundaries)
+
+Byte*64		Sample Loop Sizes (L)
+Byte*64		Sample Loop Sizes (H)
+Byte*64		Sample Loop Sizes (B)
+
+Byte*3		Sequencer Reset Address
+Byte*13		(Reserved)
+
+Byte*15		Exporter Version Tag
+Byte		'.'
+Byte*4		Number of PCM Channels ("1CH." "2CH." "3CH." "4CH." ascii)
+Byte*4		Expansion Chip Used ("----" or "VRC6" ascii)
+Byte*8		(Reserved)
+Byte*16		animal
+
+*** these bytes must have 0f0h added to them
+
+--------------------------------------------------------------------------------
+
+Program Region
+
+The NES program fills this space upto a certain address.
+
+Byte*6352	<copy 3b0h-307fh from driver binary>
+
+--------------------------------------------------------------------------------
+
+Sequencer Data Format
+
+For Each Frame:
+
+Byte		Channel Data Header
+		bits0-3: channel select
+			0:sqr1		1:sqr2 
+			2:tri 		3:noise 
+			4:vrc1 		5:vrc2 
+			6:saw 		7:pcm1 
+			8:pcm2 		9:pcm3 
+			10:pcm4		11:page-cross
+			12:end frame	13:reserved
+			14:reserved	15:end track
+		bits4-7: data bits a=bit4 b=bit5 c=bit6 d=bit7
+
+Byte*x		Channel Data
+
+<repeat until frame is completed>
+
+Byte		Duration (see end frame/track)
+________________________________________________________________________________
+[Channel 0,1 - 2A03 Square Wave]
+
+a: Reset Sweep (Hardware)
+b&c: Change Period/Sweep (Hardware) **
+d: Duty/Volume/Envelope Setting Byte follows (Reg. $4000/$4004)
+
+cb **
+00: period (L) and (H) bytes follow (Reg. $4002-3/$4006-7)
+01: sweep byte follows (written to hardware sweep register) (Reg. $4001/$4005)
+10: period (L) byte follows (Reg. $4002/$4006) 
+11: no action
+________________________________________________________________________________
+[Channel 2 - 2A03 Triangle]
+
+a: Reset Sweep (Software)
+b&c: Pitch Change/Pitch Slide (Software) **
+d: Enable bit (Reg. $4008)
+
+cb **
+00: period (L) and (H) bytes follow (Reg. $400A-$400B)
+01: sweep byte follows (written to software sweep variable)
+10: period (L) byte follows (Reg. $400A)
+11: no action
+________________________________________________________________________________
+[Channel 3 - 2A03 Noise]
+
+abcd: Noise Volume (Reg. $400C bits0-3)
+
+Following Byte (always): Noise Loop and Period (Reg. $400E)
+________________________________________________________________________________
+[Channel 4,5,6 VRC6 Pulse/Sawtooth]
+
+a: Reset Sweep (Software)
+b&c: Pitch Change/Pitch Slide (Software) **
+d: Duty/Volume Setting Byte follows (Reg. $9000,$A000,$B000)
+
+cb **
+00: period (L) and (H) bytes follow (Reg. $9001-2/$A001-2/$B001-2)
+01: sweep byte follows (written to software sweep variable)
+10: period (L) byte follows (Reg. $9001/$A001/$B001)
+11: no action
+
+Note: For sawtooth channel (6), volume byte ($B000) ranges from 0-42
+________________________________________________________________________________
+[Channel 7,8,9,10 PCM]
+
+a: New Sample (sets rate=0 and sample index follows)
+b: Volume Byte Follows
+c&d: Frequency Change/Frequency Slide **
+
+Volume byte ranges from 0-31 and has a special bit operation applied
+  actual byte = (volume<<7) | (volume>>1)
+  (volume "ROTATE LEFT" 7)
+
+dc **
+00: Frequency (L) and (H) bytes follow, Sweep is reset
+01: Sweep byte follows (writen to software sweep variable)
+10: Frequency (L) byte follows, Sweep is reset
+11: no action
+
+For sample index byte, range is 0-63, MSB is a sample-offset switch.
+If the MSB is set (&128) then a sample-offset byte follows which cause
+the sample to be started at "sample_offset * 256" bytes.
+________________________________________________________________________________
+[Channel 11]
+
+Page-Cross:
+
+  When this operation is encountered then the sequencer will increment the
+  page counter and reset the byte-address. This byte is required before the
+  page ends. Data after this byte in the same page is ignored.
+________________________________________________________________________________
+[Channel 12]
+
+End of Frame:
+ 
+  Marks the end of the frame, a "duration" byte follows which is loaded into
+  the sequencer counter to control when the next frame will occur.
+
+  Caution: Make sure the duration byte is not the last byte in the page to leave
+  room for a page-cross event.
+________________________________________________________________________________
+[Channel 15]
+
+End of Track:
+ 
+  Marks the end of the track, a "duration" byte follows which is loaded into
+  the sequencer counter to control when the next frame will occur.
+
+  The sequencer position will be reloaded with the "Sequencer Reset Address"
+
+--------------------------------------------------------------------------------
+
+Frame Duration
+
+In order to compute the frame duration from an amount of time, the execution
+process of the frame must be considered.
+
+See supernsf_timing.txt for a complete description of the program execution.
+
+--------------------------------------------------------------------------------
+
+Software Sweeps
+
+SuperNSF features a software-sweep function to possibly reduce sequencer data
+required.
+
+A 'sweep byte' is a signed value [-128,127] which is added to the frequency
+or period of a channel each time a frame occurs. Sweep bytes are always
+reset if a direct-pitch command is used (either lower or complete writes).
+
+The 2A03 square waves have a hardware sweep function, and the sweep byte for
+those channels is written directly to the hardware registers. (and they
+are also reset if a direct-pitch command is used).
+
+The software sweep is applied after the 'end of frame/track' command is used.
+
+--------------------------------------------------------------------------------
+
+Sample Format
+
+Samples are in 6-bit unsigned format (stored in bits0-5 of each byte, with top 2
+bits cleared). In order for the pcm mixer to operate correctly, some rules must
+be followed:
+
+1) One-shot samples must have a small 256-byte loop (zeros) added to the end
+2) While outputting samples, the exporter must write additional 'unrolled' 
+   data after the sample ends until the next page is reached (not required if the
+   sample ends exactly on the next page). This page and bank should be recorded
+   for the 'sample end' data in the track header.
+3) An additional 256 bytes of padding data must be written after the sample end.
+   (containing more unrolled loop data, or zero data for one-shot)
+
+Definition of 'zero': 128/2
+
+--------------------------------------------------------------------------------
+
+Pitch Format
+
+The pitch format used in the sequencer data varies between channel types.
+
+NESCLOCK = 1789773
+f = Desired frequency
+
+2A03 Square, VRC6 Pulse, VRC6 Sawtooth:
+  1789773*2 / f - 1
+
+2A03 Triangle:
+  1789773 / f - 1
+
+PCM:
+  f*256 / (1789773/CFI)
+
+  CFI = 79,112,139,166 (with 1-4 PCM channels used)
+
+--------------------------------------------------------------------------------
+
+Other notes:
+
+See wiki.nesdev.com for APU register specific information.
+
+--------------------------------------------------------------------------------
+11:43 PM 8/5/2010  update
+12:52 AM 8/4/2010  expand
+11:34 AM 7/19/2010 initial writing
