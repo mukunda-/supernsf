@@ -150,6 +150,10 @@ __init:
 	lda	#15
 	sta	$4015
 	
+	lda	#$08
+	sta	$4001
+	sta	$4005
+	
 	lda	#3<<4
 	sta	$400C
 	lda	#31<<3
